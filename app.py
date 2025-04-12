@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask_cors import CORS, jsonify
 from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)  # allow requests from your frontend
+CORS(app, origins=["https://shiva9964599018.github.io"])
 
 # Replace these with your Supabase project details
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
