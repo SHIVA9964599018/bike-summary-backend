@@ -23,7 +23,8 @@ def calculate_summary(data):
 
     data = sorted(data, key=lambda x: x["at_distance"])
     total_distance = data[-1]["at_distance"] - data[0]["at_distance"]
-    total_expense = sum(row["amount"] for row in data)
+   # total_expense = sum(row["amount"] for row in data)
+    total_expense = sum(row["amount"] for row in data[:-1])
     total_fuel = total_expense / 103
     mileage = round(total_distance / total_fuel, 2)
 
