@@ -52,12 +52,13 @@ def calculate_summary(data):
 
 @app.route("/api/bike-summary")
 def bike_summary():
-    response = supabase.table("bike_fuel_log").select("*").execute()
-    data = response.data
+    try:
+        response = supabase.table("bike_fuel_log").select("*").execute()
+        data = response.data
+        summary = calculate_summary(data)
+        return jsonify(summary)
+    except Exception as e:
+        print("🚨 Error in /api/bike-summary:", e)
+        return jsonify({"error": str(e)}), 500
 
-    summary = calculate_summary(data)
-    return jsonify(summary)
-
-if __name__ == "__main__":
-    app.run(debug=True)
 
