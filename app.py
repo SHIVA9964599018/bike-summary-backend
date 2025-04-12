@@ -53,7 +53,7 @@ def calculate_summary(data):
 @app.route("/api/bike-summary")
 def bike_summary():
     try:
-        response = supabase.table("bike_fuel_log").select("*").execute()
+        response = supabase.table("bike_history").select("*").execute()
         data = response.data
         summary = calculate_summary(data)
         return jsonify(summary)
