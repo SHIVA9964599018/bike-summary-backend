@@ -126,21 +126,5 @@ def organize_expenses(data):
         "weekly_breakdown": weekly_data,
     }
 
-@app.route("/api/bike-summary")
-def bike_summary():
-    try:
-        response = supabase.table("bike_history").select("*").execute()
-        data = response.data
-        summary = calculate_summary(data)
-        expenses = organize_expenses(data)
-
-        return jsonify({**summary, **expenses})
-    except Exception as e:
-        print("🚨 Error in /api/bike-summary:", e)
-        return jsonify({"error": str(e)}), 500
-
-    except Exception as e:
-        print("🚨 Error in /api/bike-expenses:", e)
-        return jsonify({"error": str(e)}), 500
 
 
