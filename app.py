@@ -96,6 +96,48 @@ def bike_expenses():
             "monthly_expenses": monthly_grouped,
             "weekly_expenses": weekly_grouped
         })
+from collections import defaultdict
+
+def organize_expenses(data):
+    monthly_data = defaultdict(lambda: defaultdict(float))  # year -> month -> total
+    weekly_data = defaultdict(float)  # date (yyyy-mm-dd) -> total
+
+    today = datetime.today()
+    one_week_ago = today - timedelta(days=7)
+
+    for row in data:
+        date_str = row["date_changed"]
+        try:
+            date_obj = datetime.fromisoformat(date_str)
+        except ValueError:
+            continue
+
+        amount = row["amount"]
+        year = str(date_obj.year)
+        month = date_obj.strftime("%b")  # Jan, Feb, etc.
+        monthly_data[year][month] += amount
+
+        if date_obj >= one_week_ago:
+            week_day = date_obj.strftime("%Y-%m-%d")
+            weekly_data[week_day] += amount
+
+    return {
+        "monthly_breakdown": monthly_data,
+        "weekly_breakdown": weekly_data,
+    }
+
+@app.route("/api/bike-summary")
+def bike_summary():
+    try:
+        response = supabase.table("bike_history").select("*").execute()
+        data = response.data
+        summary = calculate_summary(data)
+        expenses = organize_expenses(data)
+
+        return jsonify({**summary, **expenses})
+    except Exception as e:
+        print("🚨 Error in /api/bike-summary:", e)
+        return jsonify({"error": str(e)}), 500
 
     except Exception as e:
         print("🚨 Error in /api/bike-expenses:", e)
