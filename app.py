@@ -4,6 +4,7 @@ from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 load_dotenv()
 
@@ -60,6 +61,44 @@ def bike_summary():
         return jsonify(summary)
     except Exception as e:
         print("🚨 Error in /api/bike-summary:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/bike-expenses")
+def bike_expenses():
+    try:
+        response = supabase.table("bike_history").select("*").execute()
+        data = response.data
+
+        # Monthly Expenses grouped by year and month
+        monthly_grouped = defaultdict(lambda: defaultdict(float))
+        weekly_grouped = defaultdict(float)
+
+        today = datetime.today()
+        one_week_ago = today - timedelta(days=7)
+
+        for row in data:
+            try:
+                date = datetime.fromisoformat(row["date_changed"])
+                year = str(date.year)
+                month = date.strftime("%b")  # Jan, Feb, etc.
+                amount = float(row["amount"])
+
+                monthly_grouped[year][month] += amount
+
+                if date >= one_week_ago:
+                    week_label = date.strftime("%Y-%m-%d")
+                    weekly_grouped[week_label] += amount
+            except Exception as parse_err:
+                print(f"Skipping row due to error: {parse_err}")
+                continue
+
+        return jsonify({
+            "monthly_expenses": monthly_grouped,
+            "weekly_expenses": weekly_grouped
+        })
+
+    except Exception as e:
+        print("🚨 Error in /api/bike-expenses:", e)
         return jsonify({"error": str(e)}), 500
 
 
