@@ -96,7 +96,7 @@ def bike_expenses():
             "monthly_expenses": monthly_grouped,
             "weekly_expenses": weekly_grouped
         })
-from collections import defaultdict
+
 
 def organize_expenses(data):
     monthly_data = defaultdict(lambda: defaultdict(float))  # year -> month -> total
