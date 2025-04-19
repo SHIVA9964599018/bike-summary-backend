@@ -4,9 +4,13 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import os
 from dotenv import load_dotenv
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)  # ✅ This allows requests from any origin
+
 
 load_dotenv()
-app = Flask(__name__)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
