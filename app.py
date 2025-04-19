@@ -1,6 +1,6 @@
 from supabase import create_client, Client
 from datetime import datetime, timedelta
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 import os
 from dotenv import load_dotenv
 
@@ -11,15 +11,15 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-
 def calculate_summary(data):
     if not data or len(data) < 2:
         print("❌ Not enough data to calculate summary")
         return
 
+   # print("🔹 Raw Data:", data)
+
     data = sorted(data, key=lambda x: x["at_distance"])
+   # print("🔹 sorted data:", data)
     total_distance = data[-1]["at_distance"] - data[0]["at_distance"]
     total_expense = sum(row["amount"] for row in data[:-1])
     total_fuel = total_expense / 103
@@ -50,7 +50,6 @@ def calculate_summary(data):
 
     print("✅ Summary:", summary)
 
-
 def calculate_expenses(data):
     monthly_grouped = defaultdict(lambda: defaultdict(lambda: {"amount": 0.0, "distance": 0.0}))
     weekly_grouped = defaultdict(float)
@@ -58,16 +57,20 @@ def calculate_expenses(data):
     today = datetime.today()
     one_week_ago = today - timedelta(days=7)
 
-    for row in data:
+    for i, row in enumerate(data):
         try:
             date = datetime.fromisoformat(row["date_changed"])
             year = str(date.year)
-            month = date.strftime("%b")
+            month = date.strftime("%b")  # Example: Jan, Feb, ...
             amount = float(row["amount"])
-            distance = float(row["at_distance"])
+
+            # Compute distance covered in that entry
+            current_distance = row["at_distance"]
+            prev_distance = data[i - 1]["at_distance"] if i > 0 else current_distance
+            distance_covered = max(0, current_distance - prev_distance)
 
             monthly_grouped[year][month]["amount"] += amount
-            monthly_grouped[year][month]["distance"] += distance
+            monthly_grouped[year][month]["distance"] += distance_covered
 
             if date >= one_week_ago:
                 week_label = date.strftime("%Y-%m-%d")
@@ -77,28 +80,27 @@ def calculate_expenses(data):
             print(f"⚠️ Skipping row due to error: {parse_err}")
             continue
 
-    # Sort the months using MONTH_ORDER
-    ordered_monthly = {}
-    for year, months in monthly_grouped.items():
-        sorted_months = OrderedDict()
-        for month in MONTH_ORDER:
-            if month in months:
-                sorted_months[month] = months[month]
-        ordered_monthly[year] = sorted_months
+    # Sort months Jan–Dec for each year
+    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    # Format nicely
-    final_monthly_expenses = {
+    monthly_expenses = {
         year: {
-            month: {
-                "amount": round(info["amount"], 2),
-                "distance": round(info["distance"], 2)
-            } for month, info in months.items()
-        } for year, months in ordered_monthly.items()
+            month: monthly_grouped[year][month]
+            for month in month_order if month in monthly_grouped[year]
+        }
+        for year in monthly_grouped
     }
 
-    print("📊 Monthly Expenses with Distance:", final_monthly_expenses)
-    print("📈 Weekly Expenses:", dict(weekly_grouped))
+    weekly_expenses = dict(weekly_grouped)
 
+    print("📊 Monthly Expenses with Distance:")
+    for year, months in monthly_expenses.items():
+        print(f"{year}:")
+        for month, values in months.items():
+            print(f"  {month}: ₹{values['amount']:.2f}, Distance: {values['distance']:.2f} km")
+
+    print("📈 Weekly Expenses:", weekly_expenses)
 
 def main():
     try:
@@ -118,6 +120,7 @@ def main():
     except Exception as e:
         print("🚨 Error fetching data:", e)
 
-
 if __name__ == "__main__":
     main()
+
+
