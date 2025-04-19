@@ -1,3 +1,6 @@
+from flask import Flask
+
+app = Flask(__name__)
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 from collections import defaultdict
