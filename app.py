@@ -1,6 +1,4 @@
 from flask import Flask
-
-app = Flask(__name__)
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -8,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
+app = Flask(__name__)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
