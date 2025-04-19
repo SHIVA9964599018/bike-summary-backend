@@ -9,14 +9,55 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# Load environment variables
 load_dotenv()
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
+# Connect to Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Month order for sorting
 MONTH_ORDER = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+
+def calculate_summary(data):
+    if not data or len(data) < 2:
+        print("❌ Not enough data to calculate summary")
+        return {}
+
+    data = sorted(data, key=lambda x: x["at_distance"])
+    total_distance = data[-1]["at_distance"] - data[0]["at_distance"]
+    total_expense = sum(row["amount"] for row in data[:-1])
+    total_fuel = total_expense / 103  # ₹103/litre assumption
+    mileage = round(total_distance / total_fuel, 2)
+
+    today = datetime.today()
+    this_month = today.strftime("%Y-%m")
+    one_week_ago = today - timedelta(days=7)
+
+    monthly_expense = sum(
+        row["amount"] for row in data
+        if row["date_changed"].startswith(this_month)
+    )
+
+    weekly_expense = sum(
+        row["amount"] for row in data
+        if datetime.fromisoformat(row["date_changed"]) >= one_week_ago
+    )
+
+    summary = {
+        "total_distance_km": total_distance,
+        "total_fuel_liters": round(total_fuel, 2),
+        "mileage_kmpl": mileage,
+        "total_expense": total_expense,
+        "monthly_expense": monthly_expense,
+        "weekly_expense": weekly_expense,
+    }
+
+    print("✅ Summary:", summary)
+    return summary
 
 
 def calculate_expenses(data):
@@ -32,10 +73,9 @@ def calculate_expenses(data):
             year = str(date.year)
             month = date.strftime("%b")
             amount = float(row["amount"])
-
-            current_distance = float(row["at_distance"])
-            prev_distance = float(data[i - 1]["at_distance"]) if i > 0 else current_distance
-            distance_covered = max(0.0, current_distance - prev_distance)
+            current_distance = row["at_distance"]
+            prev_distance = data[i - 1]["at_distance"] if i > 0 else current_distance
+            distance_covered = max(0, current_distance - prev_distance)
 
             monthly_grouped[year][month]["amount"] += amount
             monthly_grouped[year][month]["distance"] += distance_covered
@@ -53,65 +93,50 @@ def calculate_expenses(data):
         sorted_months = OrderedDict()
         for month in MONTH_ORDER:
             if month in months:
-                sorted_months[month] = months[month]
+                sorted_months[month] = {
+                    "amount": round(months[month]["amount"], 2),
+                    "distance": round(months[month]["distance"], 2)
+                }
         ordered_monthly[year] = sorted_months
 
-    final_monthly_expenses = {
-        year: {
-            month: {
-                "amount": round(info["amount"], 2),
-                "distance": round(info["distance"], 2)
-            } for month, info in months.items()
-        } for year, months in ordered_monthly.items()
-    }
+    print("📊 Monthly Expenses with Distance:", ordered_monthly)
+    print("📈 Weekly Expenses:", dict(weekly_grouped))
 
-    return final_monthly_expenses, dict(weekly_grouped)
+    return ordered_monthly, dict(weekly_grouped)
 
 
 @app.route("/api/bike-summary", methods=["GET"])
 def bike_summary():
     try:
         response = supabase.table("bike_history").select("*").execute()
-        data = response.data
-        sorted_data = sorted(data, key=lambda x: x["at_distance"])
+        data = sorted(response.data, key=lambda x: x["at_distance"])
+        summary = calculate_summary(data)
+        return jsonify(summary)
+    except Exception as e:
+        print("🚨 Error fetching summary:", e)
+        return jsonify({"error": "Failed to fetch summary"}), 500
 
-        if not sorted_data or len(sorted_data) < 2:
-            return jsonify({"error": "Not enough data"}), 400
 
-        total_distance = sorted_data[-1]["at_distance"] - sorted_data[0]["at_distance"]
-        total_expense = sum(row["amount"] for row in sorted_data[:-1])
-        total_fuel = total_expense / 103
-        mileage = round(total_distance / total_fuel, 2)
-
-        today = datetime.today()
-        this_month = today.strftime("%Y-%m")
-        one_week_ago = today - timedelta(days=7)
-
-        monthly_expense = sum(
-            row["amount"] for row in sorted_data
-            if row["date_changed"].startswith(this_month)
-        )
-
-        weekly_expense = sum(
-            row["amount"] for row in sorted_data
-            if datetime.fromisoformat(row["date_changed"]) >= one_week_ago
-        )
-
-        monthly_expenses, weekly_expenses = calculate_expenses(sorted_data)
+@app.route("/api/bike-expenses", methods=["GET"])
+def bike_expenses():
+    try:
+        response = supabase.table("bike_history").select("*").execute()
+        data = sorted(response.data, key=lambda x: x["at_distance"])
+        monthly, weekly = calculate_expenses(data)
 
         return jsonify({
-            "total_distance_km": round(total_distance, 2),
-            "total_fuel_liters": round(total_fuel, 2),
-            "mileage_kmpl": mileage,
-            "total_expense": round(total_expense, 2),
-            "monthly_expense": round(monthly_expense, 2),
-            "weekly_expense": round(weekly_expense, 2),
-            "monthly_expenses": monthly_expenses,
-            "weekly_expenses": weekly_expenses,
+            "monthly_expenses": monthly,
+            "weekly_expenses": weekly
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("🚨 Error fetching expenses:", e)
+        return jsonify({"error": "Failed to fetch expenses"}), 500
+
+
+@app.route("/", methods=["GET"])
+def index():
+    return "🚴 Bike Tracker API is running."
 
 
 if __name__ == "__main__":
